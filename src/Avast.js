@@ -9,13 +9,14 @@ const awaitMs = async (ms) => {
 }
 
 class Avast {
-  constructor () {
+  constructor (sockFile = defaultSockFile) {
     this.client = null
+    this.sockFile = sockFile
     this.resultMap = new Map()
   }
 
-  connect(sockFile = defaultSockFile) {
-    const client = net.createConnection(sockFile)
+  connect() {
+    const client = net.createConnection(this.sockFile)
 
     client.on('connect', () => {
       this.client = client
@@ -57,7 +58,7 @@ class Avast {
 
   async scanFile(filePath) {
     if (!this.client) {
-      throw new Error('Client not connected')
+      await this.connect(this.sockFile)
     }
 
     const command = `scan ${filePath}\n`

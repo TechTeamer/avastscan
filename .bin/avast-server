@@ -13,8 +13,7 @@ const avast = new Avast()
 const PORT = process.env.AVAST_SERVER_PORT || 4311
 const REQ_SIZE_LIMIT = process.env.AVAST_SERVER_REQ_SIZE_LIMIT || '50mb'
 
-app.use(bodyParser({ limit: REQ_SIZE_LIMIT }))
-app.use(bodyParser.json())
+app.use(bodyParser.json({limit: REQ_SIZE_LIMIT}))
 
 avast.connect()
 
