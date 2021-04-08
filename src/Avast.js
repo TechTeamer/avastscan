@@ -79,6 +79,7 @@ class Avast {
       }
     }
 
+    this.resultMap.delete(filePath)
     return scanResult
   }
 }
