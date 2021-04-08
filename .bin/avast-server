@@ -1,0 +1,39 @@
+#!/usr/bin/env node
+
+const express = require('express')
+const bodyParser = require('body-parser')
+const fs = require('fs').promises
+const Avast = require('../src/Avast')
+
+const { withTempFile } = require('../src/temp')
+
+const app = express()
+const avast = new Avast()
+
+const PORT = process.env.AVAST_SERVER_PORT || 4311
+const REQ_SIZE_LIMIT = process.env.AVAST_SERVER_REQ_SIZE_LIMIT || '50mb'
+
+app.use(bodyParser({ limit: REQ_SIZE_LIMIT }))
+app.use(bodyParser.json())
+
+avast.connect()
+
+app.post('/scan', async (req, res) => {
+  const { file } = req.body
+
+  if (!file) {
+    return res.status(400).json({ error: 'Missing file' })
+  }
+
+  const buffer = Buffer.from(file, 'base64')
+
+  await withTempFile(async (file) => {
+    await fs.writeFile(file, buffer)
+    const result = await avast.scanFile(file)
+    return res.json(result)
+  })
+})
+
+app.listen(PORT, () => {
+  console.log(`Avast Scan Web Server listening at port ${PORT}`)
+})
