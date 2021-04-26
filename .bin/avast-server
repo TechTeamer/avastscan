@@ -2,35 +2,63 @@
 
 const express = require('express')
 const bodyParser = require('body-parser')
-const fs = require('fs').promises
+const fileUpload = require('express-fileupload')
+const timeout = require('connect-timeout')
 const Avast = require('../src/Avast')
-
-const { withTempFile } = require('../src/temp')
 
 const app = express()
 const avast = new Avast()
 
 const PORT = process.env.AVAST_SERVER_PORT || 4311
 const REQ_SIZE_LIMIT = process.env.AVAST_SERVER_REQ_SIZE_LIMIT || '50mb'
+const MAX_TIMEOUT = process.env.AVAST_SERVER_MAX_TIMEOUT ? parseInt(process.env.AVAST_SERVER_MAX_TIMEOUT, 10) : 30
 
+function haltOnTimedout (req, res, next) {
+  if (!req.timedout) next()
+}
+
+app.use(timeout(`${MAX_TIMEOUT}s`))
 app.use(bodyParser.json({limit: REQ_SIZE_LIMIT}))
+app.use(haltOnTimedout)
+app.use(fileUpload({
+  useTempFiles: true,
+  tempFileDir: '/tmp/'
+}))
 
 avast.connect()
 
-app.post('/scan', async (req, res) => {
-  const { file } = req.body
+process.on('SIGTERM', () => {
+  setTimeout(() => {
+    process.exit(143) // 128 + SIGTERM see http://people.cs.pitt.edu/~alanjawi/cs449/code/shell/UnixSignals.htm
+  }, 1000)
+})
 
-  if (!file) {
+process.on('SIGINT', () => {
+  setTimeout(() => {
+    process.exit(130) // 128 + SIGINT see http://people.cs.pitt.edu/~alanjawi/cs449/code/shell/UnixSignals.htm
+  }, 1000)
+})
+
+app.get('/info', async (req, res) => {
+  const info = await avast.getInfo()
+
+  console.log('Info request result', info)
+
+  return res.json(info)
+})
+
+app.post('/scan', async (req, res) => {
+  if (!req.files || !req.files.file) {
+    console.log('Request failed due to missing file')
     return res.status(400).json({ error: 'Missing file' })
   }
 
-  const buffer = Buffer.from(file, 'base64')
+  const file = req.files.file
 
-  await withTempFile(async (file) => {
-    await fs.writeFile(file, buffer)
-    const result = await avast.scanFile(file)
-    return res.json(result)
-  })
+  const result = await avast.scanFile(file.tempFilePath)
+  console.log(`File scan result: `, { name: file.name, size: file.size, tmpPath: file.tempFilePath, result })
+
+  return res.json(result)
 })
 
 app.listen(PORT, () => {

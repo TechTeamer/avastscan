@@ -1,21 +1,29 @@
-const axios = require('axios')
+const fetch = require('node-fetch')
+const FormData = require('form-data')
 
 class AvastClient {
-  constructor(baseURL) {
-    this.api = axios.create({
-      baseURL,
-      timeout: 10000
-    })
-  }
+  constructor(options) {
+    const { baseURL, timeout = 30000 } = options || {}
 
-  // Accepts buffer or base64 string
-  async scanFile(file) {
-    if (Buffer.isBuffer(file)) {
-      const response = await this.api.post('/scan', { file: file.toString('base64') })
-      return response.data
+    if (!baseURL) {
+      throw new Error('BaseURL not provided')
     }
 
-    throw new Error('AvastClient#scanFile requires buffer as input')
+    this.baseURL = baseURL
+    this.timeout = timeout
+  }
+
+  // Accepts fileStreams or buffers
+  async scanFile(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await fetch(`${this.baseURL}/scan`, { method: 'POST', body: formData, timeout: this.timeout })
+    return response.json()
+  }
+
+  async getInfo() {
+    const response = await fetch(`${this.baseURL}/info`, { method: 'GET', timeout: this.timeout })
+    return response.json()
   }
 }
 

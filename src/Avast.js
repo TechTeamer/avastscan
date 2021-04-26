@@ -1,4 +1,6 @@
 const net = require('net')
+const { promisify } = require('util');
+const exec = promisify(require('child_process').exec)
 
 const defaultSockFile = '/var/run/avast/scan.sock'
 
@@ -66,6 +68,20 @@ class Avast {
     this.client.write(command)
 
     return this._getScanResult(filePath)
+  }
+
+  async getInfo() {
+    if (!this.client) {
+      await this.connect(this.sockFile)
+    }
+
+    const version = await exec('scan -v')
+    const vps = await exec('scan -V')
+
+    return {
+      version: version.stdout.trim(),
+      virusDefinitionsVersion: vps.stdout.trim()
+    }
   }
 
   async _getScanResult(filePath) {
