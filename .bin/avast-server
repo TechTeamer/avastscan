@@ -3,23 +3,18 @@
 const express = require('express')
 const bodyParser = require('body-parser')
 const fileUpload = require('express-fileupload')
-const timeout = require('connect-timeout')
 const Avast = require('../src/Avast')
 
 const app = express()
-const avast = new Avast()
 
 const PORT = process.env.AVAST_SERVER_PORT || 4311
 const REQ_SIZE_LIMIT = process.env.AVAST_SERVER_REQ_SIZE_LIMIT || '50mb'
-const MAX_TIMEOUT = process.env.AVAST_SERVER_MAX_TIMEOUT ? parseInt(process.env.AVAST_SERVER_MAX_TIMEOUT, 10) : 30
+const MAX_TIMEOUT = process.env.AVAST_SERVER_MAX_TIMEOUT ? parseInt(process.env.AVAST_SERVER_MAX_TIMEOUT, 10) : 30000
+const SOCK_FILE = process.env.AVAST_SERVER_SOCK_FILE || '/var/run/avast/scan.sock'
 
-function haltOnTimedout (req, res, next) {
-  if (!req.timedout) next()
-}
+const avast = new Avast(SOCK_FILE, MAX_TIMEOUT)
 
-app.use(timeout(`${MAX_TIMEOUT}s`))
 app.use(bodyParser.json({limit: REQ_SIZE_LIMIT}))
-app.use(haltOnTimedout)
 app.use(fileUpload({
   useTempFiles: true,
   tempFileDir: '/tmp/'
@@ -55,10 +50,16 @@ app.post('/scan', async (req, res) => {
 
   const file = req.files.file
 
-  const result = await avast.scanFile(file.tempFilePath)
-  console.log(`File scan result: `, { name: file.name, size: file.size, tmpPath: file.tempFilePath, result })
+  try {
+    const result = await avast.scanFile(file.tempFilePath)
+    console.log(`File scan result: `, { name: file.name, size: file.size, tmpPath: file.tempFilePath, result })
 
-  return res.json(result)
+    return res.json(result)
+  } catch (err) {
+    console.error(err)
+    return res.sendStatus(500)
+  }
+
 })
 
 app.listen(PORT, () => {

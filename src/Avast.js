@@ -1,6 +1,8 @@
 const net = require('net')
 const { promisify } = require('util');
 const exec = promisify(require('child_process').exec)
+const fs = require('fs').promises
+const path = require('path')
 
 const defaultSockFile = '/var/run/avast/scan.sock'
 
@@ -11,10 +13,11 @@ const awaitMs = async (ms) => {
 }
 
 class Avast {
-  constructor (sockFile = defaultSockFile) {
+  constructor (sockFile = defaultSockFile, timeout = 30000) {
     this.client = null
     this.sockFile = sockFile
     this.resultMap = new Map()
+    this.timeout = timeout
   }
 
   connect() {
@@ -31,6 +34,10 @@ class Avast {
     client.on('data', data => {
       const lines = data.toString().split(/\r\n/gm)
       for (const line of lines) {
+        if (line.trim() === '200 SCAN OK') {
+          this.scanning = false
+        }
+
         if (line.startsWith('SCAN')) {
           const args = line.split(/\t/gm)
 
@@ -59,6 +66,22 @@ class Avast {
   }
 
   async scanFile(filePath) {
+    try {
+      // Confirm that file exists
+      await fs.stat(filePath)
+    } catch (err) {
+      console.error(err)
+      throw err
+    }
+
+    filePath = path.normalize(filePath)
+
+    while (this.scanning) {
+      await  awaitMs(300)
+    }
+
+    this.scanning = true
+
     if (!this.client) {
       await this.connect(this.sockFile)
     }
@@ -85,18 +108,29 @@ class Avast {
   }
 
   async _getScanResult(filePath) {
+    let timeout = Date.now() + this.timeout
     await awaitMs(300)
     let scanResult = null
 
-    while(!scanResult) {
-      if (this.resultMap.has(filePath)) {
-        scanResult = this.resultMap.get(filePath)
-      } else {
+    while(!scanResult && Date.now() <= timeout) {
+      if (this.scanning) {
         await awaitMs(300)
+      } else {
+        if (this.resultMap.has(filePath)) {
+          scanResult = this.resultMap.get(filePath)
+        } else {
+          this.resultMap.delete(filePath)
+          throw new Error('Finished scanning with no results')
+        }
       }
     }
 
+    this.scanning = false
     this.resultMap.delete(filePath)
+    if (!scanResult) {
+      throw new Error('Scan Result Timeout')
+    }
+
     return scanResult
   }
 }
