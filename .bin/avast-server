@@ -57,6 +57,9 @@ app.post('/scan', async (req, res) => {
     return res.json(result)
   } catch (err) {
     console.error(err)
+    if (err.message === 'Scan Result Timeout') {
+      return res.sendStatus(408)
+    }
     return res.sendStatus(500)
   }
 
