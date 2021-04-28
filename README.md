@@ -10,8 +10,10 @@ You can set the following env variables
 - AVAST_SERVER_REQ_SIZE_LIMIT (default: 50mb) 
   Maximum request size that the web server accepts. 
   NOTE: use the format (size)mb (or kb, etc)
-- AVAST_SERVER_MAX_TIMEOUT (default: 30)
-  Time out for requests. (In seconds)
+- AVAST_SERVER_MAX_TIMEOUT (default: 30000)
+  Time out for requests. (In miliseconds)
+- AVAST_SERVER_SOCK_FILE (default: /var/run/avast/scan.sock)
+  Socket file for avast
   
 ### Endpoints
 
