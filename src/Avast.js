@@ -1,26 +1,24 @@
 const net = require('net')
-const { promisify } = require('util');
+const { promisify } = require('util')
 const exec = promisify(require('child_process').exec)
 const fs = require('fs').promises
 const path = require('path')
 
-const defaultSockFile = '/var/run/avast/scan.sock'
-
 const awaitMs = async (ms) => {
-  return new Promise((res) => {
-    setTimeout(res, ms)
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
   })
 }
 
 class Avast {
-  constructor (sockFile = defaultSockFile, timeout = 30000) {
+  constructor (sockFile = '/var/run/avast/scan.sock', timeout = 30000) {
     this.client = null
     this.sockFile = sockFile
     this.resultMap = new Map()
     this.timeout = timeout
   }
 
-  connect() {
+  connect () {
     const client = net.createConnection(this.sockFile)
 
     client.on('connect', () => {
@@ -52,8 +50,8 @@ class Avast {
                 this.resultMap.set(rootFileName, { is_infected: false, is_excluded: true })
               }
             } else {
-              const malware_name = args[args.length-1].replace(/\\/g,'')
-              this.resultMap.set(rootFileName, { is_infected: true, malware_name })
+              const malwareName = args[args.length - 1].replace(/\\/g, '')
+              this.resultMap.set(rootFileName, { is_infected: true, malware_name: malwareName })
             }
           } else {
             if (!this.resultMap.has(rootFileName)) {
@@ -65,7 +63,7 @@ class Avast {
     })
   }
 
-  async scanFile(filePath) {
+  async scanFile (filePath) {
     try {
       // Confirm that file exists
       await fs.stat(filePath)
@@ -77,7 +75,7 @@ class Avast {
     filePath = path.normalize(filePath)
 
     while (this.scanning) {
-      await  awaitMs(300)
+      await awaitMs(300)
     }
 
     this.scanning = true
@@ -93,7 +91,7 @@ class Avast {
     return this._getScanResult(filePath)
   }
 
-  async getInfo() {
+  async getInfo () {
     if (!this.client) {
       await this.connect(this.sockFile)
     }
@@ -107,12 +105,12 @@ class Avast {
     }
   }
 
-  async _getScanResult(filePath) {
-    let timeout = Date.now() + this.timeout
+  async _getScanResult (filePath) {
+    const timeout = Date.now() + this.timeout
     await awaitMs(300)
     let scanResult = null
 
-    while(!scanResult && Date.now() <= timeout) {
+    while (!scanResult && Date.now() <= timeout) {
       if (this.scanning) {
         await awaitMs(300)
       } else {

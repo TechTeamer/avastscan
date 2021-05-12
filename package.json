@@ -1,10 +1,11 @@
 {
-  "name": "avastscan",
+  "name": "@techteamer/avastscan",
   "version": "1.0.0",
-  "description": "",
+  "description": "Library for interacting with avast antivirus for linux",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "lint": "eslint .",
+    "test": "eslint ."
   },
   "bin": {
     "avast-server": ".bin/avast-server"
@@ -13,8 +14,8 @@
     "type": "git",
     "url": "git+https://github.com/TechTeamer/avastscan.git"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "TechTeamer",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/TechTeamer/avastscan/issues"
   },
@@ -26,7 +27,15 @@
     "form-data": "^4.0.0",
     "node-fetch": "^2.6.1"
   },
+  "devDependencies": {
+    "eslint": "^7.17.0",
+    "eslint-config-standard": "^16.0.2",
+    "eslint-plugin-import": "^2.14.0",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-promise": "^5.1.0",
+    "eslint-plugin-standard": "^5.0.0"
+  },
   "engines": {
-    "node": ">=10.x"
+    "node": ">=12.13"
   }
 }
