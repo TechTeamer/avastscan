@@ -1,4 +1,8 @@
-# Avast-Server
+# @TechTeamer/avastscan
+
+NodeJS binding for Avast Linux Antivirus
+
+## Avast-Server
 avast-server is a utility to scan files through http requests without the files originally being in the same machine.
 
 ### Documentation
