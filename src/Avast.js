@@ -3,6 +3,7 @@ const { promisify } = require('util')
 const exec = promisify(require('child_process').exec)
 const fs = require('fs').promises
 const path = require('path')
+const async = require('async')
 
 const awaitMs = async (ms) => {
   return new Promise((resolve) => {
@@ -11,89 +12,69 @@ const awaitMs = async (ms) => {
 }
 
 class Avast {
-  constructor (sockFile = '/var/run/avast/scan.sock', timeout = 30000) {
+  constructor (sockFile = '/var/run/avast/scan.sock', timeoutMs = 30000, logger = null) {
     this.client = null
     this.sockFile = sockFile
     this.resultMap = new Map()
-    this.timeout = timeout
-  }
+    this.timeoutMs = timeoutMs
+    this.logger = logger
 
-  connect () {
-    const client = net.createConnection(this.sockFile)
-
-    client.on('connect', () => {
-      this.client = client
-    })
-
-    client.on('error', data => {
-      console.error('Server error: ', data)
-    })
-
-    client.on('data', data => {
-      const lines = data.toString().split(/\r\n/gm)
-      for (const line of lines) {
-        if (line.trim() === '200 SCAN OK') {
-          this.scanning = false
+    this.queue = async.queue(async (task, callback) => {
+      try {
+        await callback(null, this.scanFile(task.filePath))
+      } catch (err) {
+        if (this.logger) {
+          this.logger.error(err)
         }
-
-        if (line.startsWith('SCAN')) {
-          const args = line.split(/\t/gm)
-
-          const fileName = args[0].split(' ')[1]
-          // This is used for archives
-          const rootFileName = fileName.split('|>')[0]
-
-          if (args.length > 2) {
-            // Is the file not excluded?
-            if (args[1].startsWith('[E]')) {
-              if (!this.resultMap.has(rootFileName)) {
-                this.resultMap.set(rootFileName, { is_infected: false, is_excluded: true })
-              }
-            } else {
-              const malwareName = args[args.length - 1].replace(/\\/g, '')
-              this.resultMap.set(rootFileName, { is_infected: true, malware_name: malwareName })
-            }
-          } else {
-            if (!this.resultMap.has(rootFileName)) {
-              this.resultMap.set(rootFileName, { is_infected: false, is_excluded: false })
-            }
-          }
-        }
+        callback(err)
       }
-    })
+    }, 1)
   }
 
-  async scanFile (filePath) {
-    try {
-      // Confirm that file exists
-      await fs.stat(filePath)
-    } catch (err) {
-      console.error(err)
-      throw err
+  async connect (reconnect = false) {
+    if (this.client && !reconnect) {
+      return Promise.resolve()
     }
 
-    filePath = path.normalize(filePath)
+    return new Promise((resolve, reject) => {
+      if (this.client) {
+        this.client.destroy()
+      }
 
-    while (this.scanning) {
-      await awaitMs(300)
-    }
+      this.client = net.createConnection(this.sockFile)
+      this.client.setTimeout(1000 + this.timeoutMs)
 
-    this.scanning = true
+      this.client.on('ready', () => {
+        this.client.on('data', this._processData.bind(this))
+        resolve()
+      })
 
-    if (!this.client) {
-      await this.connect(this.sockFile)
-    }
+      this.client.on('timeout', () => {
+        this.client.destroy() // => will emit 'close'
+        reject(new Error('avastscan timeout'))
+      })
 
-    const command = `scan ${filePath}\n`
+      this.client.on('end', () => { // https://nodejs.org/api/net.html#net_event_end
+        this.client.end() // TODO: will emit 'close' ????
+      })
 
-    this.client.write(command)
+      // TODO
+      this.client.on('error', err => { // after this will emit 'close'
+        if (this.logger) {
+          this.logger.error(err)
+        }
+      })
 
-    return this._getScanResult(filePath)
+      this.client.on('close', () => {
+        this.client.removeAllListeners()
+        this.client = null
+      })
+    })
   }
 
   async getInfo () {
     if (!this.client) {
-      await this.connect(this.sockFile)
+      await this.connect()
     }
 
     const version = await exec('scan -v')
@@ -105,31 +86,74 @@ class Avast {
     }
   }
 
-  async _getScanResult (filePath) {
-    const timeout = Date.now() + this.timeout
-    await awaitMs(300)
-    let scanResult = null
+  async scanFile (filePath) {
+    return await this.queue.push({ filePath })
+  }
 
-    while (!scanResult && Date.now() <= timeout) {
-      if (this.scanning) {
-        await awaitMs(300)
-      } else {
-        if (this.resultMap.has(filePath)) {
-          scanResult = this.resultMap.get(filePath)
-        } else {
-          this.resultMap.delete(filePath)
-          throw new Error('Finished scanning with no results')
-        }
+  async _scanFile (filePath) {
+    const normalizedFilePath = path.normalize(filePath)
+
+    // Confirm that file exists
+    await fs.stat(normalizedFilePath)
+
+    if (!this.client) {
+      await this.connect()
+    }
+
+    const command = `scan ${normalizedFilePath}\n`
+
+    this.client.write(command)
+
+    const timeout = Date.now() + this.timeoutMs
+
+    while (Date.now() <= timeout) {
+      await awaitMs(300)
+      if (this.resultMap.has(normalizedFilePath)) {
+        break
       }
     }
 
-    this.scanning = false
-    this.resultMap.delete(filePath)
+    const scanResult = this.resultMap.get(normalizedFilePath)
+    this.resultMap.delete(normalizedFilePath)
+
     if (!scanResult) {
       throw new Error('Scan Result Timeout')
     }
 
     return scanResult
+  }
+
+  async _processData (data) {
+    const lines = data.toString().split(/\r\n/gm)
+    for (const line of lines) {
+      if (line.trim() === '200 SCAN OK') {
+        // do nothing
+      }
+
+      if (line.startsWith('SCAN')) {
+        const args = line.split(/\t/gm)
+
+        const fileName = args[0].split(' ')[1]
+        // This is used for archives
+        const rootFileName = fileName.split('|>')[0]
+
+        if (args.length > 2) {
+          // Is the file not excluded?
+          if (args[1].startsWith('[E]')) {
+            if (!this.resultMap.has(rootFileName)) {
+              this.resultMap.set(rootFileName, { is_infected: false, is_excluded: true })
+            }
+          } else {
+            const malwareName = args[args.length - 1].replace(/\\/g, '')
+            this.resultMap.set(rootFileName, { is_infected: true, malware_name: malwareName })
+          }
+        } else {
+          if (!this.resultMap.has(rootFileName)) {
+            this.resultMap.set(rootFileName, { is_infected: false, is_excluded: false })
+          }
+        }
+      }
+    }
   }
 }
 
