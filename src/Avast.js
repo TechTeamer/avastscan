@@ -99,25 +99,25 @@ class Avast {
   }
 
   async _scanFile (filePath) {
-    const normalizedFilePath = path.normalize(filePath)
+    const resolvedFilePath = path.resolve(filePath)
 
     // Confirm that file exists
-    await fs.stat(normalizedFilePath)
+    await fs.stat(resolvedFilePath)
 
-    const command = `SCAN ${normalizedFilePath}\n`
+    const command = `SCAN ${resolvedFilePath}\n`
 
     this.client.write(command)
 
     const timeout = Date.now() + this.timeoutMs
     while (Date.now() <= timeout) {
       await awaitMs(100)
-      if (this.resultMap.has(normalizedFilePath)) {
+      if (this.resultMap.has(resolvedFilePath)) {
         break
       }
     }
 
-    const scanResult = this.resultMap.get(normalizedFilePath)
-    this.resultMap.delete(normalizedFilePath)
+    const scanResult = this.resultMap.get(resolvedFilePath)
+    this.resultMap.delete(resolvedFilePath)
 
     if (!scanResult) {
       throw new Error('Scan Result Timeout')
