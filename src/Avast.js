@@ -1,6 +1,4 @@
 const net = require('net')
-const { promisify } = require('util')
-const exec = promisify(require('child_process').exec)
 const fs = require('fs').promises
 const path = require('path')
 const async = require('async')
@@ -18,16 +16,10 @@ class Avast {
     this.resultMap = new Map()
     this.timeoutMs = timeoutMs
     this.logger = logger
+    this.avastInfo = null
 
-    this.queue = async.queue(async (task, callback) => {
-      try {
-        await callback(null, this.scanFile(task.filePath))
-      } catch (err) {
-        if (this.logger) {
-          this.logger.error(err)
-        }
-        callback(err)
-      }
+    this.queue = async.queue(async (task) => {
+      return await this._scanFile(task.filePath)
     }, 1)
   }
 
@@ -37,9 +29,7 @@ class Avast {
     }
 
     return new Promise((resolve, reject) => {
-      if (this.client) {
-        this.client.destroy()
-      }
+      this.close()
 
       this.client = net.createConnection(this.sockFile)
       this.client.setTimeout(1000 + this.timeoutMs)
@@ -72,22 +62,40 @@ class Avast {
     })
   }
 
-  async getInfo () {
-    if (!this.client) {
-      await this.connect()
-    }
-
-    const version = await exec('scan -v')
-    const vps = await exec('scan -V')
-
-    return {
-      version: version.stdout.trim(),
-      virusDefinitionsVersion: vps.stdout.trim()
+  async close () {
+    if (this.client) {
+      this.client.destroy()
     }
   }
 
+  async getInfo () {
+    await this.connect()
+
+    this.client.write('VPS\n')
+
+    const timeout = Date.now() + this.timeoutMs
+    while (Date.now() <= timeout) {
+      await awaitMs(100)
+      if (this.avastInfo) {
+        break
+      }
+    }
+
+    return this.avastInfo
+  }
+
   async scanFile (filePath) {
-    return await this.queue.push({ filePath })
+    await this.connect()
+
+    return new Promise((resolve, reject) => {
+      this.queue.push({ filePath }, (err, result) => {
+        if (err) {
+          reject(err)
+          return
+        }
+        resolve(result)
+      })
+    })
   }
 
   async _scanFile (filePath) {
@@ -96,18 +104,13 @@ class Avast {
     // Confirm that file exists
     await fs.stat(normalizedFilePath)
 
-    if (!this.client) {
-      await this.connect()
-    }
-
-    const command = `scan ${normalizedFilePath}\n`
+    const command = `SCAN ${normalizedFilePath}\n`
 
     this.client.write(command)
 
     const timeout = Date.now() + this.timeoutMs
-
     while (Date.now() <= timeout) {
-      await awaitMs(300)
+      await awaitMs(100)
       if (this.resultMap.has(normalizedFilePath)) {
         break
       }
@@ -126,8 +129,8 @@ class Avast {
   async _processData (data) {
     const lines = data.toString().split(/\r\n/gm)
     for (const line of lines) {
-      if (line.trim() === '200 SCAN OK') {
-        // do nothing
+      if (line.startsWith('VPS')) {
+        this.avastInfo = line.replace('VPS ', '').trim()
       }
 
       if (line.startsWith('SCAN')) {
