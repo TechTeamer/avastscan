@@ -144,7 +144,10 @@ class Avast {
           // Is the file not excluded?
           if (args[1].startsWith('[E]')) {
             if (!this.resultMap.has(rootFileName)) {
-              this.resultMap.set(rootFileName, { is_infected: false, is_excluded: true })
+              if (line.includes('Archive\\ is\\ password\\ protected')) {
+                this.resultMap.set(rootFileName, { is_infected: false, is_excluded: false, is_password_protected: true })
+              }
+              this.resultMap.set(rootFileName, { is_infected: false, is_excluded: true, is_password_protected: false })
             }
           } else {
             const malwareName = args[args.length - 1].replace(/\\/g, '')
@@ -152,7 +155,7 @@ class Avast {
           }
         } else {
           if (!this.resultMap.has(rootFileName)) {
-            this.resultMap.set(rootFileName, { is_infected: false, is_excluded: false })
+            this.resultMap.set(rootFileName, { is_infected: false, is_excluded: false, is_password_protected: false })
           }
         }
       }
