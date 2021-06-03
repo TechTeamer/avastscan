@@ -127,13 +127,19 @@ class Avast {
       throw new Error('Scan Result Timeout')
     }
 
-    const is_safe = !scanResult.is_infected && !scanResult.is_password_protected
+    const is_safe = !scanResult.is_infected && !scanResult.is_password_protected && !scanResult.permission_denied
     return { history: this.history, is_safe, ...scanResult }
   }
 
   async _processData (data) {
     const lines = data.toString().split(/\r\n/gm)
     for (const line of lines) {
+      // Engine Error
+      if (line.startsWith('451')) {
+        this.logger.error('Engine error', line)
+        throw new Error('Engine error')
+      }
+
       if (line.startsWith('VPS')) {
         this.avastInfo = line.replace('VPS ', '').trim()
       }
@@ -154,7 +160,9 @@ class Avast {
           if (args[1].startsWith('[E]')) {
             if (line.includes('Archive\\ is\\ password\\ protected')) {
               this.resultMap.get(rootFileName).is_password_protected = true
-            } else {
+            } else if (line.includes('Permission\\ denied')) {
+              this.resultMap.get(rootFileName).permission_denied = true
+            } {
               this.resultMap.get(rootFileName).is_excluded = true
             }
           } else {
