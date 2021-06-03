@@ -128,13 +128,17 @@ class Avast {
     }
 
     const is_safe = !scanResult.is_infected && !scanResult.is_password_protected && !scanResult.permission_denied
-    return { history: [...this.history], is_safe, ...scanResult }
+    return { 
+      history: [...this.history], 
+      is_safe, 
+      ...scanResult 
+    }
   }
 
   async _processData (data) {
     const lines = data.toString().split(/\r\n/gm)
     for (const line of lines) {
-      // Engine Error
+      // Engine Error (451 Engine Error) <- message
       if (line.startsWith('451')) {
         this.logger.error('Engine error', line)
         throw new Error('Engine error')
@@ -157,18 +161,19 @@ class Avast {
 
         if (args.length > 2) {
           // Is the file not excluded?
+          const result = this.resultMap.get(rootFileName)
           if (args[1].startsWith('[E]')) {
             if (line.includes('Archive\\ is\\ password\\ protected')) {
-              this.resultMap.get(rootFileName).is_password_protected = true
+              result.is_password_protected = true
             } else if (line.includes('Permission\\ denied')) {
-              this.resultMap.get(rootFileName).permission_denied = true
-            } {
-              this.resultMap.get(rootFileName).is_excluded = true
+              result.permission_denied = true
+            } else {
+              result.is_excluded = true
             }
           } else {
             const malwareName = args[args.length - 1].replace(/\\/g, '')
-            this.resultMap.get(rootFileName).is_infected = true
-            this.resultMap.get(rootFileName).malware_names.push(malwareName)
+            result.is_infected = true
+            result.malware_names.push(malwareName)
           }
         }
       }
