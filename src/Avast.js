@@ -128,7 +128,7 @@ class Avast {
     }
 
     const is_safe = !scanResult.is_infected && !scanResult.is_password_protected && !scanResult.permission_denied
-    return { history: this.history, is_safe, ...scanResult }
+    return { history: [...this.history], is_safe, ...scanResult }
   }
 
   async _processData (data) {
