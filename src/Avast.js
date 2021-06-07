@@ -17,6 +17,7 @@ class Avast {
     this.timeoutMs = timeoutMs
     this.logger = logger
     this.avastInfo = null
+    this.history = []
 
     this.queue = async.queue(async (task) => {
       return await this._scanFile(task.filePath)
@@ -104,6 +105,9 @@ class Avast {
     // Confirm that file exists
     await fs.stat(resolvedFilePath)
 
+    // reset everything
+    this.history = []
+
     const command = `SCAN ${resolvedFilePath}\n`
 
     this.client.write(command)
@@ -123,36 +127,53 @@ class Avast {
       throw new Error('Scan Result Timeout')
     }
 
-    return scanResult
+    const is_safe = !scanResult.is_infected && !scanResult.is_password_protected && !scanResult.permission_denied
+    return { 
+      history: [...this.history], 
+      is_safe, 
+      ...scanResult 
+    }
   }
 
   async _processData (data) {
     const lines = data.toString().split(/\r\n/gm)
     for (const line of lines) {
+      // Engine Error (451 Engine Error) <- message
+      if (line.startsWith('451')) {
+        this.logger.error('Engine error', line)
+        throw new Error('Engine error')
+      }
+
       if (line.startsWith('VPS')) {
         this.avastInfo = line.replace('VPS ', '').trim()
       }
 
       if (line.startsWith('SCAN')) {
         const args = line.split(/\t/gm)
-
         const fileName = args[0].split(' ')[1]
         // This is used for archives
         const rootFileName = fileName.split('|>')[0]
+        this.history.push(line)
+
+        if (!this.resultMap.get(rootFileName)) {
+          this.resultMap.set(rootFileName, { is_infected: false, is_excluded: false, is_password_protected: false, malware_names: [] })
+        }
 
         if (args.length > 2) {
           // Is the file not excluded?
+          const result = this.resultMap.get(rootFileName)
           if (args[1].startsWith('[E]')) {
-            if (!this.resultMap.has(rootFileName)) {
-              this.resultMap.set(rootFileName, { is_infected: false, is_excluded: true })
+            if (line.includes('Archive\\ is\\ password\\ protected')) {
+              result.is_password_protected = true
+            } else if (line.includes('Permission\\ denied')) {
+              result.permission_denied = true
+            } else {
+              result.is_excluded = true
             }
           } else {
             const malwareName = args[args.length - 1].replace(/\\/g, '')
-            this.resultMap.set(rootFileName, { is_infected: true, malware_name: malwareName })
-          }
-        } else {
-          if (!this.resultMap.has(rootFileName)) {
-            this.resultMap.set(rootFileName, { is_infected: false, is_excluded: false })
+            result.is_infected = true
+            result.malware_names.push(malwareName)
           }
         }
       }
