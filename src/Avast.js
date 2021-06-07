@@ -127,11 +127,11 @@ class Avast {
       throw new Error('Scan Result Timeout')
     }
 
-    const is_safe = !scanResult.is_infected && !scanResult.is_password_protected && !scanResult.permission_denied
-    return { 
-      history: [...this.history], 
-      is_safe, 
-      ...scanResult 
+    const isSafe = !scanResult.is_infected && !scanResult.is_password_protected && !scanResult.permission_denied
+    return {
+      history: [...this.history],
+      is_safe: isSafe,
+      ...scanResult
     }
   }
 
