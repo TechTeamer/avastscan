@@ -127,6 +127,10 @@ class Avast {
       throw new Error('Scan Result Timeout')
     }
 
+    if (scanResult.error) {
+      throw scanResult.Error
+    }
+
     const isSafe = !scanResult.is_infected && !scanResult.is_password_protected && !scanResult.permission_denied
     return {
       history: [...this.history],
@@ -141,7 +145,8 @@ class Avast {
       // Engine Error (451 Engine Error) <- message
       if (line.startsWith('451')) {
         this.logger.error('Engine error', line)
-        throw new Error('Engine error')
+        this.resultMap.set(rootFileName, { error: true, Error: new Error('Engine error') })
+        return
       }
 
       if (line.startsWith('VPS')) {
