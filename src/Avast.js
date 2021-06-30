@@ -146,7 +146,7 @@ class Avast {
       if (line.startsWith('451')) {
         const args = line.split(/\t/gm)
         const fileName = args[0].split(' ')[1]
-        const rootFileName =  fileName.split('|>')[0]
+        const rootFileName = fileName.split('|>')[0]
         this.logger.error('Engine error', line)
         this.resultMap.set(rootFileName, { error: true, Error: new Error('Engine error') })
         return
@@ -160,7 +160,7 @@ class Avast {
         const args = line.split(/\t/gm)
         const fileName = args[0].split(' ')[1]
         // This is used for archives
-        const rootFileName =  fileName.split('|>')[0]
+        const rootFileName = fileName.split('|>')[0]
         this.history.push(line)
 
         if (!this.resultMap.get(rootFileName)) {
