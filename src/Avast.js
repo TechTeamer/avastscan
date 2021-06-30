@@ -142,6 +142,10 @@ class Avast {
   async _processData (data) {
     const lines = data.toString().split(/\r\n/gm)
     for (const line of lines) {
+      const args = line.split(/\t/gm)
+      const fileName = args[0].split(' ')[1]
+      const rootFileName = fileName.split('|>')[0]
+
       // Engine Error (451 Engine Error) <- message
       if (line.startsWith('451')) {
         this.logger.error('Engine error', line)
@@ -154,10 +158,7 @@ class Avast {
       }
 
       if (line.startsWith('SCAN')) {
-        const args = line.split(/\t/gm)
-        const fileName = args[0].split(' ')[1]
         // This is used for archives
-        const rootFileName = fileName.split('|>')[0]
         this.history.push(line)
 
         if (!this.resultMap.get(rootFileName)) {
