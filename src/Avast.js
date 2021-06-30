@@ -122,13 +122,15 @@ class Avast {
 
     const scanResult = this.resultMap.get(resolvedFilePath)
     this.resultMap.delete(resolvedFilePath)
+    const scanError = this.resultMap.get('error')
+    this.resultMap.delete('error')
+
+    if (scanError) {
+      throw scanError
+    }
 
     if (!scanResult) {
       throw new Error('Scan Result Timeout')
-    }
-
-    if (scanResult.error) {
-      throw scanResult.Error
     }
 
     const isSafe = !scanResult.is_infected && !scanResult.is_password_protected && !scanResult.permission_denied
@@ -144,11 +146,8 @@ class Avast {
     for (const line of lines) {
       // Engine Error (451 Engine Error) <- message
       if (line.startsWith('451')) {
-        const args = line.split(/\t/gm)
-        const fileName = args[0].split(' ')[1]
-        const rootFileName = fileName.split('|>')[0]
         this.logger.error('Engine error', line)
-        this.resultMap.set(rootFileName, { error: true, Error: new Error('Engine error') })
+        this.resultMap.set('error', new Error('Engine error'))
         return
       }
 
