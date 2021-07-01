@@ -118,6 +118,12 @@ class Avast {
       if (this.resultMap.has(resolvedFilePath)) {
         break
       }
+
+      const scanError = this.resultMap.get('error')
+      if (scanError) {
+        this.resultMap.delete('error')
+        throw scanError
+      }
     }
 
     const scanResult = this.resultMap.get(resolvedFilePath)
@@ -141,7 +147,23 @@ class Avast {
       // Engine Error (451 Engine Error) <- message
       if (line.startsWith('451')) {
         this.logger.error('Engine error', line)
-        throw new Error('Engine error')
+        this.resultMap.set('error', new Error('Engine error'))
+        return
+      }
+      if (line.startsWith('466')) {
+        this.logger.error('License error', line)
+        this.resultMap.set('error', new Error('License error'))
+        return
+      }
+      if (line.startsWith('501')) {
+        this.logger.error('Syntax error', line)
+        this.resultMap.set('error', new Error('Syntax error'))
+        return
+      }
+      if (line.startsWith('520')) {
+        this.logger.error('URL blocked', line)
+        this.resultMap.set('error', new Error('URL blocked'))
+        return
       }
 
       if (line.startsWith('VPS')) {
