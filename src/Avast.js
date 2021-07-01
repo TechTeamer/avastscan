@@ -118,16 +118,16 @@ class Avast {
       if (this.resultMap.has(resolvedFilePath)) {
         break
       }
+
+      const scanError = this.resultMap.get('error')
+      if (scanError) {
+        this.resultMap.delete('error')
+        throw scanError
+      }
     }
 
     const scanResult = this.resultMap.get(resolvedFilePath)
     this.resultMap.delete(resolvedFilePath)
-    const scanError = this.resultMap.get('error')
-    this.resultMap.delete('error')
-
-    if (scanError) {
-      throw scanError
-    }
 
     if (!scanResult) {
       throw new Error('Scan Result Timeout')
@@ -148,6 +148,21 @@ class Avast {
       if (line.startsWith('451')) {
         this.logger.error('Engine error', line)
         this.resultMap.set('error', new Error('Engine error'))
+        return
+      }
+      if (line.startsWith('466')) {
+        this.logger.error('License error', line)
+        this.resultMap.set('error', new Error('License error'))
+        return
+      }
+      if (line.startsWith('501')) {
+        this.logger.error('Syntax error', line)
+        this.resultMap.set('error', new Error('Syntax error'))
+        return
+      }
+      if (line.startsWith('520')) {
+        this.logger.error('URL blocked', line)
+        this.resultMap.set('error', new Error('URL blocked'))
         return
       }
 
