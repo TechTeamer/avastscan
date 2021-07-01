@@ -1,3 +1,6 @@
+2.1.0
+- fix avast errors
+
 2.0.0
 - Scan history
 - Handle excluded files properly
