@@ -1,5 +1,5 @@
 const net = require('net')
-const fs = require('fs').promises
+const fs = require('node:fs/promises')
 const path = require('path')
 const async = require('async')
 
