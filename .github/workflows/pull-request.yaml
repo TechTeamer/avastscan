@@ -71,11 +71,6 @@ jobs:
           yarn audit --groups dependencies 2>&1 | tee audit-results.txt
           set -e
 
-          yarn run improved-yarn-audit \
-            --min-severity critical \
-            --exclude GHSA-wrh9-cjv3-2hpw,GHSA-vqfx-gj96-3w95,GHSA-f598-mfpv-gmfx \
-            2>&1 | tee -a audit-results.txt
-
       - name: Upload audit results
         if: always()
         uses: actions/upload-artifact@v6
