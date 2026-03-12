@@ -1,5 +1,3 @@
-const FormData = require('form-data')
-
 class AvastClient {
   constructor (options) {
     const { baseURL, timeout = 30000 } = options || {}

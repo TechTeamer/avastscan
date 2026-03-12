@@ -17,17 +17,16 @@
   },
   "homepage": "https://github.com/TechTeamer/avastscan#readme",
   "dependencies": {
-    "async": "^3.2.4",
-    "form-data": "^4.0.0"
+    "async": "^3.2.4"
   },
   "devDependencies": {
-    "eslint": "^8.21.0",
+    "eslint": "^10.0.3",
     "eslint-config-standard": "^17.0.0",
     "eslint-plugin-import": "^2.26.0",
-    "eslint-plugin-n": "^15.2.4",
-    "eslint-plugin-promise": "^6.0.0"
+    "eslint-plugin-n": "^17.24.0",
+    "eslint-plugin-promise": "^7.2.1"
   },
   "engines": {
-    "node": ">=16.13"
+    "node": ">=24"
   }
 }
